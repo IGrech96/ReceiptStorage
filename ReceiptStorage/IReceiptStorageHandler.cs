@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ReceiptStorage;
 
-public interface IReceiptStorage
+public interface IReceiptStorageHandler
 {
-    Task<ReceiptHandleResponse> Handle(Stream content, string name);
+    Task<ReceiptHandleResponse> Handle(Stream content, string name, CancellationToken cancellationToken);
 }

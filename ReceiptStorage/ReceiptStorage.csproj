@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="itext" Version="8.0.4" />
+    <PackageReference Include="System.Linq.Async" Version="6.0.1" />
+  </ItemGroup>
+
 </Project>

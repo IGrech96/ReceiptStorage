@@ -7,11 +7,11 @@ public record ReceiptHandleResponse
     [MemberNotNullWhen(true, nameof(FileName), nameof(Details))]
     public bool Success => Status == ReceiptHandleResponseStatus.Ok;
 
-    public ReceiptHandleResponseStatus Status { get; private set; }
+    public ReceiptHandleResponseStatus Status { get; private init; }
 
     public string? FileName { get; private set; }
 
-    public (string name, string data)[]? Details { get; private set; } 
+    public ReceiptDetails? Details { get; private set; } 
 
     private ReceiptHandleResponse()
     {
@@ -28,7 +28,7 @@ public record ReceiptHandleResponse
         return new() { Status = ReceiptHandleResponseStatus.UnknowError };
     }
 
-    public static ReceiptHandleResponse Ok(string fileName, (string name, string data)[] details)
+    public static ReceiptHandleResponse Ok(string fileName, ReceiptDetails details)
     {
         return new()
         {
@@ -47,4 +47,19 @@ public enum ReceiptHandleResponseStatus
 
     Ok
 
+}
+
+public record struct ReceiptDetails
+{
+    public string Title { get; set; }
+
+    public DateTime Timestamp { get; set; }
+
+    public string Type { get; set; }
+
+    public double Amount { get; set; }
+
+    public string Currency { get; set; }
+
+    public (string name, string data)[] Details { get; set; } 
 }

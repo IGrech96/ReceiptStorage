@@ -11,18 +11,18 @@ namespace ReceiptStorage.TelegramBot;
 
 public class TelegramHostedService : IHostedService
 {
-    private readonly IReceiptStorage _storage;
+    private readonly IReceiptStorageHandler _storageHandler;
     private readonly ILogger<TelegramHostedService> _logger;
     private readonly IOptions<BotSettings> _options;
     private readonly TelegramBotClient _client;
     private readonly CancellationTokenSource _receivingCancellationTokenSource;
 
     public TelegramHostedService(
-        IReceiptStorage storage,
+        IReceiptStorageHandler storageHandler,
         ILogger<TelegramHostedService> logger,
         IOptions<BotSettings> options)
     {
-        _storage = storage;
+        _storageHandler = storageHandler;
         _logger = logger;
         _options = options;
         _client = new TelegramBotClient(_options.Value.Token);
@@ -90,7 +90,7 @@ public class TelegramHostedService : IHostedService
             cancellationToken: cancellationToken);
         memoryStream.Position = 0;
 
-        var info = await _storage.Handle(memoryStream, fileInfo.Name);
+        var info = await _storageHandler.Handle(memoryStream, fileInfo.Name, cancellationToken);
         if (info.Status is ReceiptHandleResponseStatus.UnrecognizedFormat)
         {
             await botClient.SendTextMessageAsync(
@@ -113,9 +113,17 @@ public class TelegramHostedService : IHostedService
         if (info.Success)
         {
             var responseText = new StringBuilder();
-            responseText.Append(Escape(info.FileName)).AppendLine(":").AppendLine();
+            responseText
+                .Append("\\(")
+                .Append(Escape(info.Details.Value.Type))
+                .Append("\\) ")
+                .Append(Escape(info.Details.Value.Title))
+                .Append(" ")
+                .Append(Escape(info.Details.Value.Timestamp.ToString("yyyy-MM-dd")))
+                .AppendLine(":")
+                .AppendLine();
 
-            foreach (var (name,data) in info.Details)
+            foreach (var (name,data) in info.Details.Value.Details)
             {
                 responseText.Append("_").Append(Escape(name)).Append(": ").Append(Escape(data)).AppendLine("_");
             }
@@ -130,7 +138,12 @@ public class TelegramHostedService : IHostedService
             );
         }
 
-        string Escape(string value) => value.Replace(".", "\\.").Replace("_", "\\_");
+        string Escape(string value) => value
+            .Replace(".", "\\.")
+            .Replace("_", "\\_")
+            .Replace("-", "\\-")
+            .Replace("(", "\\(")
+            .Replace(")", "\\)");
 
     }
 

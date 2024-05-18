@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34728.123
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReceiptStorage", "ReceiptStorage\ReceiptStorage.csproj", "{5F97F4A7-B06C-4A66-AA33-84B1342A4C83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReceiptStorage", "ReceiptStorage\ReceiptStorage.csproj", "{5F97F4A7-B06C-4A66-AA33-84B1342A4C83}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReceiptStorage.TelegramBot", "ReceiptStorage.TelegramBot\ReceiptStorage.TelegramBot.csproj", "{C90EFBE6-3FBE-41FA-AE08-E13095DC6B97}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReceiptStorage.TelegramBot", "ReceiptStorage.TelegramBot\ReceiptStorage.TelegramBot.csproj", "{C90EFBE6-3FBE-41FA-AE08-E13095DC6B97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReceiptStorage.Tests", "ReceiptStorage.Tests\ReceiptStorage.Tests.csproj", "{4F20198A-9244-4390-9F79-29B0073D4B2D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{C90EFBE6-3FBE-41FA-AE08-E13095DC6B97}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C90EFBE6-3FBE-41FA-AE08-E13095DC6B97}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C90EFBE6-3FBE-41FA-AE08-E13095DC6B97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F20198A-9244-4390-9F79-29B0073D4B2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F20198A-9244-4390-9F79-29B0073D4B2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F20198A-9244-4390-9F79-29B0073D4B2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F20198A-9244-4390-9F79-29B0073D4B2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
