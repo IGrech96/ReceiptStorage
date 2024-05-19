@@ -82,8 +82,9 @@ public class TelegramHostedService : IHostedService
             return;
         }
 
+        _logger.LogInformation($"Request '{fileInfo.Name}' received.");
         await using var memoryStream = new MemoryStream();
-        //await botClient.GetInfoAndDownloadFileAsync(fileInfo.FileId, memoryStream, cancellationToken);
+
         await botClient.GetInfoAndDownloadFileAsync(
             fileId: fileInfo.FileId,
             destination: memoryStream,
@@ -137,6 +138,8 @@ public class TelegramHostedService : IHostedService
                 cancellationToken: cancellationToken
             );
         }
+
+        _logger.LogInformation($"Request '{fileInfo.Name}' completed.");
 
         string Escape(string value) => value
             .Replace(".", "\\.")
