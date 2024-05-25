@@ -1,5 +1,5 @@
 name: Build on release
-run-name: ${{ github.actor }} building release ${{github.event.release}}
+run-name: ${{ github.actor }} building release ${{github.event.release.tag_name}}
 on: 
   release: 
     types: created
@@ -22,4 +22,4 @@ jobs:
           context: .
           file: ./ReceiptStorage.TelegramBot//Dockerfile
           push: true
-          tags: ivang2896044/receiptstorage:${{github.event.release}}
+          tags: ivang2896044/receiptstorage:${{github.event.release.tag_name}}
