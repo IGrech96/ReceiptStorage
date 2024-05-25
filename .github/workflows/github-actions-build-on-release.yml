@@ -20,6 +20,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./ReceiptStorage.TelegramBot//Dockerfile
           push: true
           tags: ivang2896044/receiptstorage:${{github.event.release}}
