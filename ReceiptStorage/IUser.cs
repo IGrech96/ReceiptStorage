@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 namespace ReceiptStorage;
 
-public interface IReceiptStorage
+public interface IUser
 {
-    Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken);
 }

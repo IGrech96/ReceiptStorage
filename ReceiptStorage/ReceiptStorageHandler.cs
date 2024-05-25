@@ -18,28 +18,45 @@ public class ReceiptStorageHandler : IReceiptStorageHandler
         _pdfTemplates = pdfTemplates.ToArray();
     }
 
-    public async Task<ReceiptHandleResponse> Handle(Stream content, string name, CancellationToken cancellationToken)
+    public async Task<ReceiptHandleResponse> Handle(Content content, IUser user,
+        CancellationToken cancellationToken)
     {
         try
         {
-            if (string.Equals(Path.GetExtension(name), ".pdf", StringComparison.InvariantCultureIgnoreCase))
+            var extension = Path.GetExtension(content.Name);
+            ReceiptDetails? details = null;
+            if (string.Equals(extension, ".pdf", StringComparison.InvariantCultureIgnoreCase))
             {
-                return await HandlePdfAsync(content, name, cancellationToken);
+                details = await ExtractPdfAsync(content, cancellationToken);
             }
 
-            return ReceiptHandleResponse.UnrecognizedFormat();
+            if (details == null)
+            {
+                return ReceiptHandleResponse.UnrecognizedFormat();
+            }
+
+            var detailsName = $"{details.Value.Title} {details.Value.Timestamp}";
+            var fileName = detailsName + extension;
+
+            content = content.WithName(fileName);
+
+            foreach (var receiptStorage in _storages)
+            {
+                await receiptStorage.SaveAsync(content, details.Value, user, cancellationToken);
+            }
+
+            return ReceiptHandleResponse.Ok(detailsName, details.Value);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Can not handle: '{name}'");
+            _logger.LogError(ex, $"Can not handle: '{content.Name}'");
             return ReceiptHandleResponse.UnknowError();
         }
     }
 
-    private async Task<ReceiptHandleResponse> HandlePdfAsync(Stream content, string name, CancellationToken cancellationToken)
+    private async Task<ReceiptDetails> ExtractPdfAsync(Content content, CancellationToken cancellationToken)
     {
-        var position = content.Position;
-        var reader = new PdfReader(content);
+        var reader = new PdfReader(content.GetStream());
         var pdfDocument = new PdfDocument(reader);
 
         var extractedInfo = await _pdfTemplates
@@ -47,27 +64,6 @@ public class ReceiptStorageHandler : IReceiptStorageHandler
             .SelectAwait(async template => await template.TryExtractAsync(pdfDocument, cancellationToken))
             .FirstOrDefaultAsync(r => r != default, cancellationToken);
 
-        if (content.Position != position && content.CanSeek)
-        {
-            content.Position = position;
-        }
-
-        if (extractedInfo == default)
-        {
-            return ReceiptHandleResponse.UnrecognizedFormat();
-        }
-
-        name = $"{extractedInfo.Title} {extractedInfo.Timestamp}";
-
-        foreach (var receiptStorage in _storages)
-        {
-            if (content.Position != position && content.CanSeek)
-            {
-                content.Position = position;
-            }
-            await receiptStorage.SaveAsync(content, extractedInfo, name + ".pdf", cancellationToken);
-        }
-
-        return ReceiptHandleResponse.Ok(name, extractedInfo);
+        return extractedInfo;
     }
 }

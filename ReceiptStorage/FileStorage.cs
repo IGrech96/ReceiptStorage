@@ -14,20 +14,21 @@ public class FileStorage : IReceiptStorage
         _options = options;
     }
 
-    public async Task SaveAsync(Stream content, ReceiptDetails info, string name, CancellationToken cancellationToken)
+    public async Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken)
     {
         await TryCreateFolder(_options.Value.RootFolder);
 
         var monthFolder = Path.Combine(_options.Value.RootFolder, $"{info.Timestamp.Year}-{info.Timestamp.Month:00}");
         await TryCreateFolder(monthFolder);
 
+        var name = content.Name;
         foreach (var invalidFileNameChar in Path.GetInvalidFileNameChars())
         {
             name = name.Replace(invalidFileNameChar, '_');
         }
 
         await using var fileStream = new FileStream(Path.Combine(monthFolder, name), FileMode.Create);
-        await content.CopyToAsync(fileStream, cancellationToken);
+        await content.GetStream().CopyToAsync(fileStream, cancellationToken);
     }
 
     async Task TryCreateFolder(string name)

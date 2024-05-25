@@ -35,7 +35,7 @@ public class PgStorage : IReceiptStorage
         _logger = logger;
     }
 
-    public async Task SaveAsync(Stream content, ReceiptDetails info, string name, CancellationToken cancellationToken)
+    public async Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken)
     {
         var dataSource = new NpgsqlDataSourceBuilder(_options.Value.ConnectionString);
         dataSource.MapComposite<(string name, string data)>("log_properties", new NameTranslator());
@@ -78,7 +78,7 @@ public class PgStorage : IReceiptStorage
             // Open the file for reading and writing
             using (var stream = manager.OpenReadWrite(oid))
             {
-                await content.CopyToAsync(stream, cancellationToken);
+                await content.GetStream().CopyToAsync(stream, cancellationToken);
             }
 
             var insertCommand = new NpgsqlCommand("""

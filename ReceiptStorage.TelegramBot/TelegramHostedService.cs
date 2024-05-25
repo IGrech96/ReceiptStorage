@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Security.Principal;
+using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -91,7 +92,7 @@ public class TelegramHostedService : IHostedService
             cancellationToken: cancellationToken);
         memoryStream.Position = 0;
 
-        var info = await _storageHandler.Handle(memoryStream, fileInfo.Name, cancellationToken);
+        var info = await _storageHandler.Handle(new Content(fileInfo.Name, memoryStream), new TelegramUser(from), cancellationToken);
         if (info.Status is ReceiptHandleResponseStatus.UnrecognizedFormat)
         {
             await botClient.SendTextMessageAsync(
@@ -155,5 +156,10 @@ public class TelegramHostedService : IHostedService
         _receivingCancellationTokenSource.Cancel();
 
         return Task.CompletedTask;
+    }
+
+    private class TelegramUser(User user) : IUser
+    {
+        private readonly User _user = user;
     }
 }
