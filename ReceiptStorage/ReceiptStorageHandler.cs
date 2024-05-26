@@ -1,19 +1,24 @@
 ﻿using iText.Kernel.Pdf;
 using Microsoft.Extensions.Logging;
+using ReceiptStorage.Tags;
+using ReceiptStorage.Templates;
 
 namespace ReceiptStorage;
 
 public class ReceiptStorageHandler : IReceiptStorageHandler
 {
     private readonly IReceiptStorage[] _storages;
+    private readonly ITagResolver _tagResolver;
     private readonly ILogger<IReceiptStorageHandler> _logger;
     private readonly IPdfTemplate[] _pdfTemplates;
     public ReceiptStorageHandler(
         IEnumerable<IReceiptStorage> storages,
         IEnumerable<IPdfTemplate> pdfTemplates,
+        ITagResolver tagResolver,
         ILogger<IReceiptStorageHandler> logger)
     {
         _storages = storages.ToArray();
+        _tagResolver = tagResolver;
         _logger = logger;
         _pdfTemplates = pdfTemplates.ToArray();
     }
@@ -34,6 +39,13 @@ public class ReceiptStorageHandler : IReceiptStorageHandler
             {
                 return ReceiptHandleResponse.UnrecognizedFormat();
             }
+
+            var tags = await _tagResolver.ResolveTagsAsync(details.Value, cancellationToken);
+
+            details = details.Value with
+            {
+                Tags = tags
+            };
 
             var detailsName = $"{details.Value.Title} {details.Value.Timestamp}";
             var fileName = detailsName + extension;

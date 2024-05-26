@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using iText.Kernel.Pdf;
 
-namespace ReceiptStorage;
+namespace ReceiptStorage.Templates;
 
 public interface IPdfTemplate
 {

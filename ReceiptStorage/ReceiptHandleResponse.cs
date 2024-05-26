@@ -51,15 +51,21 @@ public enum ReceiptHandleResponseStatus
 
 public record struct ReceiptDetails
 {
-    public string Title { get; set; }
+    public ReceiptDetails()
+    {
+        
+    }
+    public required string Title { get; set; }
 
-    public DateTime Timestamp { get; set; }
+    public required DateTime Timestamp { get; set; }
 
-    public string Type { get; set; }
+    public required string Type { get; set; }
 
-    public double Amount { get; set; }
+    public required double Amount { get; set; }
 
-    public string Currency { get; set; }
+    public required string Currency { get; set; }
 
-    public (string name, string data)[] Details { get; set; } 
+    public (string name, string data)[] Details { get; set; } = [];
+
+    public string[] Tags { get; set; } = [];
 }

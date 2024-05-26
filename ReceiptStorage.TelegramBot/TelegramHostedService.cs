@@ -130,6 +130,10 @@ public class TelegramHostedService : IHostedService
                 responseText.Append("_").Append(Escape(name)).Append(": ").Append(Escape(data)).AppendLine("_");
             }
 
+            responseText.AppendLine();
+
+            responseText.AppendLine(string.Join(", ", info.Details.Value.Tags.Select(t => Escape("#" + t))));
+
 
             await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
@@ -147,7 +151,8 @@ public class TelegramHostedService : IHostedService
             .Replace("_", "\\_")
             .Replace("-", "\\-")
             .Replace("(", "\\(")
-            .Replace(")", "\\)");
+            .Replace(")", "\\)")
+            .Replace("#", "\\#");
 
     }
 
