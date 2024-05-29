@@ -23,4 +23,4 @@ jobs:
           context: .
           file: ./ReceiptStorage.TelegramBot//Dockerfile
           push: true
-          tags: ivang2896044/receiptstorage:${{github.event.release.tag_name}}
+          tags: ivang2896044/receiptstorage:${{github.event.release.tag_name}},ivang2896044/receiptstorage:latest
