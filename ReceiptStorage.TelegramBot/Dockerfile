@@ -6,10 +6,11 @@ WORKDIR /app
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
+ARG TARGETARCH
 WORKDIR /src
 COPY ["ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj", "ReceiptStorage.TelegramBot/"]
 COPY ["ReceiptStorage/ReceiptStorage.csproj", "ReceiptStorage/"]
-RUN dotnet restore -a $TARGETARCH "./ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj"
+RUN dotnet restore "./ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj" -a $TARGETARCH 
 COPY . .
 WORKDIR "/src/ReceiptStorage.TelegramBot"
 RUN dotnet build "./ReceiptStorage.TelegramBot.csproj" -a $TARGETARCH -c $BUILD_CONFIGURATION -o /app/build
