@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using ReceiptStorage.Tags;
 
 namespace ReceiptStorage.Tests;
@@ -50,7 +51,7 @@ public class TagResolverTests
 
         var expectedTitleRule = new TagResolverRule()
         {
-            Tag = "$property",
+            Tag = "$propertyvalue",
             PropertyName = new()
             {
                 Equals = "Title"
@@ -103,7 +104,10 @@ public class TagResolverTests
             }
         };
 
-        var resolver = new TagResolver(new OptionsWrapper<TagResolverSettings>(settings));
+        var options = Substitute.For<IOptionsMonitor<TagResolverSettings>>();
+        options.CurrentValue.Returns(settings);
+
+        var resolver = new TagResolver(options);
 
         var details1 = new ReceiptDetails()
         {

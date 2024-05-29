@@ -7,9 +7,9 @@ namespace ReceiptStorage.Tags;
 
 public class TagResolver : ITagResolver
 {
-    private readonly IOptions<TagResolverSettings> _options;
+    private readonly IOptionsMonitor<TagResolverSettings> _options;
 
-    public TagResolver(IOptions<TagResolverSettings> options)
+    public TagResolver(IOptionsMonitor<TagResolverSettings> options)
     {
         _options = options;
     }
@@ -17,7 +17,7 @@ public class TagResolver : ITagResolver
     public ValueTask<string[]> ResolveTagsAsync(ReceiptDetails details, CancellationToken cancellationToken)
     {
         var tags = new List<string>();
-        foreach (var (_,rule) in _options.Value.Rules)
+        foreach (var (_,rule) in _options.CurrentValue.Rules)
         {
             if (TryMatch(details, rule, out var tag))
             {

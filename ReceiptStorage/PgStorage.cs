@@ -26,10 +26,10 @@ public class PgStorage : IReceiptStorage
             };
         }
     }
-    private readonly IOptions<PgStorageSettings> _options;
+    private readonly IOptionsMonitor<PgStorageSettings> _options;
     private readonly ILogger<IReceiptStorage> _logger;
 
-    public PgStorage(IOptions<PgStorageSettings> options, ILogger<IReceiptStorage> logger)
+    public PgStorage(IOptionsMonitor<PgStorageSettings> options, ILogger<IReceiptStorage> logger)
     {
         _options = options;
         _logger = logger;
@@ -37,7 +37,7 @@ public class PgStorage : IReceiptStorage
 
     public async Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken)
     {
-        var dataSource = new NpgsqlDataSourceBuilder(_options.Value.ConnectionString);
+        var dataSource = new NpgsqlDataSourceBuilder(_options.CurrentValue.ConnectionString);
         dataSource.MapComposite<(string name, string data)>("log_properties", new NameTranslator());
 
         await using var connection = await dataSource.Build().OpenConnectionAsync(cancellationToken);

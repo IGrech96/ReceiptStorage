@@ -7,18 +7,19 @@ namespace ReceiptStorage;
 public class FileStorage : IReceiptStorage
 {
     private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1);
-    private readonly IOptions<FileStorageSettings> _options;
+    private readonly IOptionsMonitor<FileStorageSettings> _options;
 
-    public FileStorage(IOptions<FileStorageSettings> options)
+    public FileStorage(IOptionsMonitor<FileStorageSettings> options)
     {
         _options = options;
     }
 
     public async Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken)
     {
-        await TryCreateFolder(_options.Value.RootFolder);
+        var rootFolder = _options.CurrentValue.RootFolder;
+        await TryCreateFolder(rootFolder);
 
-        var monthFolder = Path.Combine(_options.Value.RootFolder, $"{info.Timestamp.Year}-{info.Timestamp.Month:00}");
+        var monthFolder = Path.Combine(rootFolder, $"{info.Timestamp.Year}-{info.Timestamp.Month:00}");
         await TryCreateFolder(monthFolder);
 
         var name = content.Name;
