@@ -9,14 +9,14 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj", "ReceiptStorage.TelegramBot/"]
 COPY ["ReceiptStorage/ReceiptStorage.csproj", "ReceiptStorage/"]
-RUN dotnet restore "./ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj"
+RUN dotnet restore -a $TARGETARCH "./ReceiptStorage.TelegramBot/ReceiptStorage.TelegramBot.csproj"
 COPY . .
 WORKDIR "/src/ReceiptStorage.TelegramBot"
-RUN dotnet build "./ReceiptStorage.TelegramBot.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./ReceiptStorage.TelegramBot.csproj" -a $TARGETARCH -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./ReceiptStorage.TelegramBot.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./ReceiptStorage.TelegramBot.csproj" -a $TARGETARCH -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
