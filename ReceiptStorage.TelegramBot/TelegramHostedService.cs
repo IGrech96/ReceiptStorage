@@ -7,11 +7,14 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace ReceiptStorage.TelegramBot;
 
 public class TelegramHostedService : IHostedService
 {
+    const string RetryCallbackData = "Retry";
+
     private readonly IReceiptStorageHandler _storageHandler;
     private readonly ILogger<TelegramHostedService> _logger;
     private readonly IOptions<BotSettings> _options;
@@ -36,7 +39,8 @@ public class TelegramHostedService : IHostedService
         {
             
             AllowedUpdates = [
-                UpdateType.Message
+                UpdateType.Message,
+                UpdateType.CallbackQuery
             ] // receive all update types except ChatMember related updates
         };
 
@@ -58,11 +62,29 @@ public class TelegramHostedService : IHostedService
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        if (update.Message is not { } message)
+        if (update.Message is  { } message)
         {
-            return;
+            await HandleMessage(botClient, message, cancellationToken);
         }
 
+        if (update.CallbackQuery is { } callback)
+        {
+            await HandleCallback(botClient, callback, cancellationToken);
+        }
+      
+    }
+
+    private async Task HandleCallback(ITelegramBotClient botClient, CallbackQuery callback, CancellationToken cancellationToken)
+    {
+        if (callback is { Data: RetryCallbackData, Message: { ReplyToMessage: {} sourceMessage } })
+        {
+            await HandleMessage(botClient, sourceMessage, cancellationToken);
+            await botClient.AnswerCallbackQueryAsync(callback.Id, cancellationToken: cancellationToken);
+        }
+    }
+
+    private async Task HandleMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+    {
         if (message.From is not { } from || !_options.Value.AcceptedUsers.Contains(from.Id))
         {
             return;
@@ -92,6 +114,13 @@ public class TelegramHostedService : IHostedService
             cancellationToken: cancellationToken);
         memoryStream.Position = 0;
 
+        var onErrorKeyboard = new InlineKeyboardMarkup(
+            new[]
+            {
+                new InlineKeyboardButton("Retry") { CallbackData = RetryCallbackData }
+            });
+
+
         var info = await _storageHandler.Handle(new Content(fileInfo.Name, memoryStream), new TelegramUser(from), cancellationToken);
         if (info.Status is ReceiptHandleResponseStatus.UnrecognizedFormat)
         {
@@ -99,6 +128,7 @@ public class TelegramHostedService : IHostedService
                 chatId: message.Chat.Id,
                 $"Unrecognized file format.",
                 replyToMessageId: message.MessageId,
+                replyMarkup: onErrorKeyboard,
                 cancellationToken: cancellationToken
             );
         }
@@ -108,6 +138,7 @@ public class TelegramHostedService : IHostedService
                 chatId: message.Chat.Id,
                 $"Unknow error.",
                 replyToMessageId: message.MessageId,
+                replyMarkup: onErrorKeyboard,
                 cancellationToken: cancellationToken
             );
         }
@@ -153,7 +184,6 @@ public class TelegramHostedService : IHostedService
             .Replace("(", "\\(")
             .Replace(")", "\\)")
             .Replace("#", "\\#");
-
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
