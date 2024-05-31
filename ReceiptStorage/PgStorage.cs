@@ -37,15 +37,15 @@ public class PgStorage : IReceiptStorage
 
     public async Task SaveAsync(Content content, ReceiptDetails info, IUser user, CancellationToken cancellationToken)
     {
-        var dataSource = new NpgsqlDataSourceBuilder(_options.CurrentValue.ConnectionString);
-        dataSource.MapComposite<(string name, string data)>("log_properties", new NameTranslator());
+        var dataSourceBuilder = new NpgsqlDataSourceBuilder(_options.CurrentValue.ConnectionString);
+        dataSourceBuilder.MapComposite<(string name, string data)>("log_properties", new NameTranslator());
 
-        await using var connection = await dataSource.Build().OpenConnectionAsync(cancellationToken);
-        //await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        NpgsqlTransaction? transaction = null;
+        var dataSource = dataSourceBuilder.Build();
 
-        try
+        await using (var checkConnection = await dataSource.OpenConnectionAsync(cancellationToken))
         {
+            //await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
             var checkTable = new NpgsqlCommand("""
                                                DO $$
                                                BEGIN
@@ -68,11 +68,16 @@ public class PgStorage : IReceiptStorage
                                                     primary key (title, logtimestamp, type)
                                                );
                                                """,
-                connection);
+                checkConnection);
 
             await checkTable.ExecuteNonQueryAsync(cancellationToken);
+        }
 
-            transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+           
             var manager = new NpgsqlLargeObjectManager(connection);
 
             uint oid = manager.Create();
@@ -107,21 +112,10 @@ public class PgStorage : IReceiptStorage
         }
         catch (Exception e)
         {
-            if (transaction != null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
+            await transaction.RollbackAsync(cancellationToken);
 
             _logger.LogError(e, "Cann not update pg log.");
         }
-        finally
-        {
-            if (transaction != null)
-            {
-                await transaction.DisposeAsync();
-            }
-        }
-
     }
 }
 
