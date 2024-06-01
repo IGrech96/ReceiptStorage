@@ -1,4 +1,5 @@
-﻿using System.Security.Principal;
+﻿using System.IO;
+using System.Security.Principal;
 using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -40,7 +41,7 @@ public class TelegramHostedService : IHostedService
             
             AllowedUpdates = [
                 UpdateType.Message,
-                UpdateType.CallbackQuery
+                UpdateType.CallbackQuery,
             ] // receive all update types except ChatMember related updates
         };
 
@@ -62,16 +63,28 @@ public class TelegramHostedService : IHostedService
 
     private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        if (update.Message is  { } message)
+        try
         {
-            await HandleMessage(botClient, message, cancellationToken);
-        }
+            if (update.Message is { ReplyToMessage: {} replyToMessage } message1)
+            {
+                await AddTagsToMessage(botClient, message1, replyToMessage, cancellationToken);
+                await botClient.DeleteMessageAsync(new ChatId(message1.Chat.Id), message1.MessageId, cancellationToken: cancellationToken);
+            }
 
-        if (update.CallbackQuery is { } callback)
-        {
-            await HandleCallback(botClient, callback, cancellationToken);
+            if (update.Message is { } message2)
+            {
+                await HandleMessage(botClient, message2, cancellationToken);
+            }
+
+            if (update.CallbackQuery is { } callback)
+            {
+                await HandleCallback(botClient, callback, cancellationToken);
+            }
         }
-      
+        catch (Exception ex)
+        {
+            await HandlePollingErrorAsync(botClient, ex, cancellationToken);
+        }
     }
 
     private async Task HandleCallback(ITelegramBotClient botClient, CallbackQuery callback, CancellationToken cancellationToken)
@@ -81,6 +94,65 @@ public class TelegramHostedService : IHostedService
             await HandleMessage(botClient, sourceMessage, cancellationToken);
             await botClient.AnswerCallbackQueryAsync(callback.Id, cancellationToken: cancellationToken);
         }
+    }
+
+    private async Task AddTagsToMessage(ITelegramBotClient botClient, Message messageWithTags, Message messageToEdit, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation($"Request to edit tags '{messageToEdit.MessageId}' received.");
+
+        var newTags = messageWithTags
+            .Text!
+            .ReplaceLineEndings(" ")
+            .Replace(",", " ")
+            .Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.TrimStart('#'))
+            .Distinct()
+            .ToArray();
+
+        var messageLines = messageToEdit.Text!.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+        var responseText = new StringBuilder();
+
+        if (messageLines.Length > 1)
+        {
+            responseText.AppendLine(Escape(messageLines[0]));
+            responseText.AppendLine(Escape(messageLines[1]));
+        }
+
+        bool hasSourceTags = messageLines.Last().StartsWith("#");
+
+        var linesToKeep = hasSourceTags ? messageLines.Length - 1 : messageLines.Length;
+        for (int index = 2; index < linesToKeep; index++)
+        {
+            if (string.IsNullOrEmpty(messageLines[index]))
+            {
+                responseText.AppendLine();
+            }
+            else
+            {
+                responseText.Append("_").Append(Escape(messageLines[index])).Append("_").AppendLine();
+            }
+        }
+
+        if (hasSourceTags)
+        {
+            responseText.Append(Escape(messageLines.Last()));
+            responseText.Append(", ");
+        }
+
+        responseText.AppendLine(string.Join(", ", newTags.Select(t => Escape("#" + t))));
+
+        var sentMessage = await botClient.EditMessageTextAsync(
+            chatId: new ChatId(messageToEdit.Chat.Id),
+            parseMode:ParseMode.MarkdownV2,
+            messageId:messageToEdit.MessageId,
+            text:responseText.ToString(),
+            cancellationToken: cancellationToken
+        );
+
+
+        _logger.LogInformation($"Request to edit tags '{messageToEdit.MessageId}' completed.");
+
     }
 
     private async Task HandleMessage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
@@ -145,46 +217,54 @@ public class TelegramHostedService : IHostedService
 
         if (info.Success)
         {
-            var responseText = new StringBuilder();
-            responseText
-                .Append("\\(")
-                .Append(Escape(info.Details.Value.Type))
-                .Append("\\) ")
-                .Append(Escape(info.Details.Value.Title))
-                .Append(" ")
-                .Append(Escape(info.Details.Value.Timestamp.ToString("yyyy-MM-dd")))
-                .AppendLine(":")
-                .AppendLine();
-
-            foreach (var (name,data) in info.Details.Value.Details)
-            {
-                responseText.Append("_").Append(Escape(name)).Append(": ").Append(Escape(data)).AppendLine("_");
-            }
-
-            responseText.AppendLine();
-
-            responseText.AppendLine(string.Join(", ", info.Details.Value.Tags.Select(t => Escape("#" + t))));
+            var responseText = InfoToText(info);
 
 
-            await botClient.SendTextMessageAsync(
+            var sentMessage = await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 responseText.ToString(),
                 parseMode:ParseMode.MarkdownV2,
                 replyToMessageId: message.MessageId,
                 cancellationToken: cancellationToken
             );
+
         }
 
         _logger.LogInformation($"Request '{fileInfo.Name}' completed.");
+    }
 
-        string Escape(string value) => value
+    private static StringBuilder InfoToText(ReceiptHandleResponse info)
+    {
+        var responseText = new StringBuilder();
+        responseText
+            .Append("\\(")
+            .Append(Escape(info.Details.Value.Type))
+            .Append("\\) ")
+            .Append(Escape(info.Details.Value.Title))
+            .Append(" ")
+            .Append(Escape(info.Details.Value.Timestamp.ToString("yyyy-MM-dd")))
+            .AppendLine(":")
+            .AppendLine();
+
+        foreach (var (name,data) in info.Details.Value.Details)
+        {
+            responseText.Append("_").Append(Escape(name)).Append(": ").Append(Escape(data)).AppendLine("_");
+        }
+
+        responseText.AppendLine();
+
+        responseText.AppendLine(string.Join(", ", info.Details.Value.Tags.Select(t => Escape("#" + t))));
+        return responseText;
+    }
+
+    private static string Escape(string value) =>
+        value
             .Replace(".", "\\.")
             .Replace("_", "\\_")
             .Replace("-", "\\-")
             .Replace("(", "\\(")
             .Replace(")", "\\)")
             .Replace("#", "\\#");
-    }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
