@@ -32,7 +32,7 @@ public class ReceiptParser : IReceiptParser
                 details = await ExtractPdfAsync(content, cancellationToken);
             }
 
-            if (details == null)
+            if (details == null || details.Value == default)
             {
                 return ReceiptParserResponse.UnrecognizedFormat();
             }

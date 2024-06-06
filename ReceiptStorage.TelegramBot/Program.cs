@@ -5,8 +5,6 @@ using ReceiptStorage.Extensions;
 using ReceiptStorage.Storages;
 using ReceiptStorage.Tags;
 using ReceiptStorage.TelegramBot;
-using ReceiptStorage.Templates;
-using Telegram.Bot;
 
 
 var host = Host.CreateApplicationBuilder();
@@ -16,7 +14,7 @@ host.Services.Configure<PgStorageSettings>(host.Configuration.GetSection(nameof(
 host.Services.Configure<FileStorageSettings>(host.Configuration.GetSection(nameof(FileStorageSettings)));
 host.Services.Configure<TagResolverSettings>(host.Configuration.GetSection(nameof(TagResolverSettings)));
 host.Services.AddSingleton<IReceiptParser, ReceiptStorage.ReceiptParser>();
-host.Services.AddSingleton<IPdfTemplate, MtbankTemplate>();
+host.Services.AddDefaultTemplates();
 host.Services.AddDefaultStorages();
 host.Services.AddSingleton<ITagResolver, TagResolver>();
 
