@@ -2,7 +2,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Options;
 
-namespace ReceiptStorage;
+namespace ReceiptStorage.Storages;
 
 public class FileStorage : IReceiptStorage
 {

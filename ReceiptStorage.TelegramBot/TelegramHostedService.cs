@@ -16,18 +16,21 @@ public class TelegramHostedService : IHostedService
 {
     const string RetryCallbackData = "Retry";
 
-    private readonly IReceiptStorageHandler _storageHandler;
+    private readonly IReceiptParser _parser;
+    private readonly IReceiptStorage _storage;
     private readonly ILogger<TelegramHostedService> _logger;
     private readonly IOptions<BotSettings> _options;
     private readonly TelegramBotClient _client;
     private readonly CancellationTokenSource _receivingCancellationTokenSource;
 
     public TelegramHostedService(
-        IReceiptStorageHandler storageHandler,
+        IReceiptParser parser,
+        IReceiptStorage storage,
         ILogger<TelegramHostedService> logger,
         IOptions<BotSettings> options)
     {
-        _storageHandler = storageHandler;
+        _parser = parser;
+        _storage = storage;
         _logger = logger;
         _options = options;
         _client = new TelegramBotClient(_options.Value.Token);
@@ -193,8 +196,9 @@ public class TelegramHostedService : IHostedService
             });
 
 
-        var info = await _storageHandler.Handle(new Content(fileInfo.Name, memoryStream), new TelegramUser(from), cancellationToken);
-        if (info.Status is ReceiptHandleResponseStatus.UnrecognizedFormat)
+        var content = new Content(fileInfo.Name, memoryStream);
+        var info = await _parser.Parse(content, cancellationToken);
+        if (info.Status is ReceiptParserResponseStatus.UnrecognizedFormat)
         {
             await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
@@ -204,7 +208,7 @@ public class TelegramHostedService : IHostedService
                 cancellationToken: cancellationToken
             );
         }
-        if (info.Status is ReceiptHandleResponseStatus.UnknowError)
+        if (info.Status is ReceiptParserResponseStatus.UnknowError)
         {
             await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
@@ -217,23 +221,38 @@ public class TelegramHostedService : IHostedService
 
         if (info.Success)
         {
-            var responseText = InfoToText(info);
+            var responceBuilder = InfoToText(info);
 
+            var finalText = responceBuilder.ToString();
+
+            responceBuilder.AppendLine("_Processing_");
 
             var sentMessage = await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
-                responseText.ToString(),
+                responceBuilder.ToString(),
                 parseMode:ParseMode.MarkdownV2,
+
                 replyToMessageId: message.MessageId,
                 cancellationToken: cancellationToken
             );
 
+            var details = info.Details.Value;
+            details.ExternalId = sentMessage.MessageId;
+
+            await _storage.SaveAsync(content, details, new TelegramUser(from), cancellationToken);
+
+            await botClient.EditMessageTextAsync(
+                chatId: new ChatId(message.Chat.Id),
+                messageId: sentMessage.MessageId,
+                text: finalText,
+                parseMode: ParseMode.MarkdownV2,
+                cancellationToken: cancellationToken);
         }
 
         _logger.LogInformation($"Request '{fileInfo.Name}' completed.");
     }
 
-    private static StringBuilder InfoToText(ReceiptHandleResponse info)
+    private static StringBuilder InfoToText(ReceiptParserResponse info)
     {
         var responseText = new StringBuilder();
         responseText

@@ -5,25 +5,22 @@ using ReceiptStorage.Templates;
 
 namespace ReceiptStorage;
 
-public class ReceiptStorageHandler : IReceiptStorageHandler
+public class ReceiptParser : IReceiptParser
 {
-    private readonly IReceiptStorage[] _storages;
     private readonly ITagResolver _tagResolver;
-    private readonly ILogger<IReceiptStorageHandler> _logger;
+    private readonly ILogger<IReceiptParser> _logger;
     private readonly IPdfTemplate[] _pdfTemplates;
-    public ReceiptStorageHandler(
-        IEnumerable<IReceiptStorage> storages,
+    public ReceiptParser(
         IEnumerable<IPdfTemplate> pdfTemplates,
         ITagResolver tagResolver,
-        ILogger<IReceiptStorageHandler> logger)
+        ILogger<IReceiptParser> logger)
     {
-        _storages = storages.ToArray();
         _tagResolver = tagResolver;
         _logger = logger;
         _pdfTemplates = pdfTemplates.ToArray();
     }
 
-    public async Task<ReceiptHandleResponse> Handle(Content content, IUser user,
+    public async Task<ReceiptParserResponse> Parse(Content content,
         CancellationToken cancellationToken)
     {
         try
@@ -37,7 +34,7 @@ public class ReceiptStorageHandler : IReceiptStorageHandler
 
             if (details == null)
             {
-                return ReceiptHandleResponse.UnrecognizedFormat();
+                return ReceiptParserResponse.UnrecognizedFormat();
             }
 
             var tags = await _tagResolver.ResolveTagsAsync(details.Value, cancellationToken);
@@ -50,19 +47,14 @@ public class ReceiptStorageHandler : IReceiptStorageHandler
             var detailsName = $"{details.Value.Title} {details.Value.Timestamp}";
             var fileName = detailsName + extension;
 
-            content = content.WithName(fileName);
+            content = content with{ Name = fileName};
 
-            foreach (var receiptStorage in _storages)
-            {
-                await receiptStorage.SaveAsync(content, details.Value, user, cancellationToken);
-            }
-
-            return ReceiptHandleResponse.Ok(detailsName, details.Value);
+            return ReceiptParserResponse.Ok(detailsName, details.Value);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Can not handle: '{content.Name}'");
-            return ReceiptHandleResponse.UnknowError();
+            return ReceiptParserResponse.UnknowError();
         }
     }
 

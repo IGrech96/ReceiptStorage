@@ -2,44 +2,44 @@
 
 namespace ReceiptStorage;
 
-public record ReceiptHandleResponse
+public record ReceiptParserResponse
 {
     [MemberNotNullWhen(true, nameof(FileName), nameof(Details))]
-    public bool Success => Status == ReceiptHandleResponseStatus.Ok;
+    public bool Success => Status == ReceiptParserResponseStatus.Ok;
 
-    public ReceiptHandleResponseStatus Status { get; private init; }
+    public ReceiptParserResponseStatus Status { get; private init; }
 
     public string? FileName { get; private set; }
 
     public ReceiptDetails? Details { get; private set; } 
 
-    private ReceiptHandleResponse()
+    private ReceiptParserResponse()
     {
 
     }
 
-    public static ReceiptHandleResponse UnrecognizedFormat()
+    public static ReceiptParserResponse UnrecognizedFormat()
     {
-        return new() { Status = ReceiptHandleResponseStatus.UnrecognizedFormat };
+        return new() { Status = ReceiptParserResponseStatus.UnrecognizedFormat };
     }
 
-    public static ReceiptHandleResponse UnknowError()
+    public static ReceiptParserResponse UnknowError()
     {
-        return new() { Status = ReceiptHandleResponseStatus.UnknowError };
+        return new() { Status = ReceiptParserResponseStatus.UnknowError };
     }
 
-    public static ReceiptHandleResponse Ok(string fileName, ReceiptDetails details)
+    public static ReceiptParserResponse Ok(string fileName, ReceiptDetails details)
     {
         return new()
         {
-            Status = ReceiptHandleResponseStatus.Ok,
+            Status = ReceiptParserResponseStatus.Ok,
             FileName = fileName,
             Details = details
         };
     }
 }
 
-public enum ReceiptHandleResponseStatus
+public enum ReceiptParserResponseStatus
 {
     UnrecognizedFormat,
 
@@ -68,4 +68,6 @@ public record struct ReceiptDetails
     public (string name, string data)[] Details { get; set; } = [];
 
     public string[] Tags { get; set; } = [];
+
+    public long ExternalId { get; set; }
 }

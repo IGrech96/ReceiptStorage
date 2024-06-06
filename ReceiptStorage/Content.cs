@@ -1,9 +1,9 @@
 ﻿namespace ReceiptStorage;
 
-public class Content
+public record Content
 {
     private readonly byte[] _stream;
-    public string Name { get; }
+    public string Name { get; init; }
 
     public Content(string name, Stream stream)
     {

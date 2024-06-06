@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 
 namespace ReceiptStorage;
 
-public interface IReceiptStorageHandler
+public interface IReceiptParser
 {
-    Task<ReceiptHandleResponse> Handle(Content content, IUser user, CancellationToken cancellationToken);
+    Task<ReceiptParserResponse> Parse(Content content, CancellationToken cancellationToken);
 }
 
