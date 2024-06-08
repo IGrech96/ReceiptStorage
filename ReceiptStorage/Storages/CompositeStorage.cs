@@ -20,4 +20,9 @@ public class CompositeStorage : IReceiptStorage
         await _dbStorage.SaveAsync(content, info, user, cancellationToken);
         await _fileStorage.SaveAsync(content, info, user, cancellationToken);
     }
+
+    public async Task<Content?> TryGetContentByExternalIdAsync(long messageId, CancellationToken cancellationToken)
+    {
+        return await _dbStorage.TryGetContentByExternalIdAsync(messageId, cancellationToken);
+    }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Data;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using NpgsqlTypes;
@@ -82,6 +83,58 @@ public class PgStorage : IReceiptStorage
 
             _logger.LogError(e, "Cann not update pg log.");
         }
+    }
+
+    public async Task<Content?> TryGetContentByExternalIdAsync(long messageId, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var command = new NpgsqlCommand("""
+                                        select file, type, title, logtimestamp from logs
+                                        where externalid = $1
+                                        """,
+            connection,
+            transaction);
+
+        command.Parameters.Add(new NpgsqlParameter() { Value = messageId, NpgsqlDbType = NpgsqlDbType.Bigint });
+
+        uint? file = null;
+        string? type = null;
+        string? title = null;
+        DateTime? logtimestamp = null;
+
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                file = reader.GetFieldValue<uint>(0);
+                type = reader.GetString(1);
+                title = reader.GetString(2);
+                logtimestamp = reader.GetDateTime(3);
+            }
+
+        }
+
+        if (file == null ||
+            type == null ||
+            title == null ||
+            logtimestamp == null)
+        {
+            return null;
+        }
+
+        var manager = new NpgsqlLargeObjectManager(connection);
+
+        await using var npgSqlStream = await manager.OpenReadAsync(file.Value, cancellationToken);
+        var memoryStream = new MemoryStream();
+        await npgSqlStream.CopyToAsync(memoryStream, cancellationToken);
+        memoryStream.Position = 0;
+
+        var content = new Content($"{title} {logtimestamp.Value:yyyy-MM-dd}", memoryStream);
+
+        return content;
+
     }
 
     private async ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)

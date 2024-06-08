@@ -15,6 +15,7 @@ namespace ReceiptStorage.TelegramBot;
 public class TelegramHostedService : IHostedService
 {
     const string RetryCallbackData = "Retry";
+    const string GetSourceCallbackData = "GetSource";
 
     private readonly IReceiptParser _parser;
     private readonly IReceiptStorage _storage;
@@ -92,10 +93,35 @@ public class TelegramHostedService : IHostedService
 
     private async Task HandleCallback(ITelegramBotClient botClient, CallbackQuery callback, CancellationToken cancellationToken)
     {
-        if (callback is { Data: RetryCallbackData, Message: { ReplyToMessage: {} sourceMessage } })
+        if (callback is { Data: RetryCallbackData, Message: { ReplyToMessage: {} messageToRetry } })
         {
-            await HandleMessage(botClient, sourceMessage, cancellationToken);
+            await HandleMessage(botClient, messageToRetry, cancellationToken);
             await botClient.AnswerCallbackQueryAsync(callback.Id, cancellationToken: cancellationToken);
+        }
+
+        if (callback is { Data: GetSourceCallbackData, Message:{} sourceMessage })
+        {
+            var content = await _storage.TryGetContentByExternalIdAsync(sourceMessage.MessageId, cancellationToken);
+            if (content != null)
+            {
+                await botClient.SendDocumentAsync(
+                    chatId: new ChatId(sourceMessage.Chat.Id),
+                    InputFile.FromStream(content.GetStream(), content.Name),
+                    replyToMessageId: sourceMessage.MessageId,
+                    cancellationToken: cancellationToken
+                );
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(
+                    chatId: new ChatId(sourceMessage.Chat.Id),
+                    "Source not found",
+                    replyToMessageId: sourceMessage.MessageId,
+                    cancellationToken: cancellationToken
+                );
+            }
+            await botClient.AnswerCallbackQueryAsync(callback.Id, cancellationToken: cancellationToken);
+
         }
     }
 
@@ -195,6 +221,12 @@ public class TelegramHostedService : IHostedService
                 new InlineKeyboardButton("Retry") { CallbackData = RetryCallbackData }
             });
 
+        var onSuccessKeyboard = new InlineKeyboardMarkup(
+            new[]
+            {
+                new InlineKeyboardButton("Get Source") { CallbackData = GetSourceCallbackData }
+            });
+
 
         var content = new Content(fileInfo.Name, memoryStream);
         var info = await _parser.Parse(content, cancellationToken);
@@ -231,8 +263,7 @@ public class TelegramHostedService : IHostedService
                 chatId: message.Chat.Id,
                 responceBuilder.ToString(),
                 parseMode:ParseMode.MarkdownV2,
-
-                replyToMessageId: message.MessageId,
+                replyMarkup: onSuccessKeyboard,
                 cancellationToken: cancellationToken
             );
 
@@ -245,7 +276,13 @@ public class TelegramHostedService : IHostedService
                 chatId: new ChatId(message.Chat.Id),
                 messageId: sentMessage.MessageId,
                 text: finalText,
+                replyMarkup:onSuccessKeyboard,
                 parseMode: ParseMode.MarkdownV2,
+                cancellationToken: cancellationToken);
+
+            await botClient.DeleteMessageAsync(
+                chatId: new ChatId(message.Chat.Id),
+                messageId: message.MessageId,
                 cancellationToken: cancellationToken);
         }
 

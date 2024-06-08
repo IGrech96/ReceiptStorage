@@ -32,6 +32,11 @@ public class FileStorage : IReceiptStorage
         await content.GetStream().CopyToAsync(fileStream, cancellationToken);
     }
 
+    public Task<Content?> TryGetContentByExternalIdAsync(long messageId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<Content?>(null);
+    }
+
     async Task TryCreateFolder(string name)
     {
         if (!Directory.Exists(name))
