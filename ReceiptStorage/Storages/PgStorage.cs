@@ -1,8 +1,10 @@
 ﻿using System.Data;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using NpgsqlTypes;
+using ReceiptStorage.Links;
 
 namespace ReceiptStorage.Storages;
 
@@ -28,11 +30,16 @@ public class PgStorage : IReceiptStorage
         }
     }
     private readonly IOptionsMonitor<PgStorageSettings> _options;
+    private readonly IOptionsMonitor<LinkSettings> _linkOptions;
     private readonly ILogger<IReceiptStorage> _logger;
 
-    public PgStorage(IOptionsMonitor<PgStorageSettings> options, ILogger<IReceiptStorage> logger)
+    public PgStorage(
+        IOptionsMonitor<PgStorageSettings> options, 
+        IOptionsMonitor<LinkSettings> linkOptions,
+        ILogger<IReceiptStorage> logger)
     {
         _options = options;
+        _linkOptions = linkOptions;
         _logger = logger;
     }
 
@@ -53,10 +60,13 @@ public class PgStorage : IReceiptStorage
             }
 
             var insertCommand = new NpgsqlCommand("""
-                                                  INSERT INTO logs (title, logtimestamp, type, amount, currency, details, file, externalid, tags)
-                                                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                                                  INSERT INTO logs (title, logtimestamp, type, amount, currency, details, file, externalid, tags, file_extension, linked_externalid)
+                                                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                                                   ON CONFLICT (title, logtimestamp, type)
-                                                  DO NOTHING;
+                                                  DO UPDATE 
+                                                  SET externalid = EXCLUDED.externalid,
+                                                      file_extension = EXCLUDED.file_extension,
+                                                      linked_externalid = EXCLUDED.linked_externalid;
                                                   """,
                 connection,
                 transaction);
@@ -71,6 +81,8 @@ public class PgStorage : IReceiptStorage
             insertCommand.Parameters.Add(new NpgsqlParameter() { Value = oid, NpgsqlDbType = NpgsqlDbType.Oid });
             insertCommand.Parameters.Add(new NpgsqlParameter() { Value = info.ExternalId, NpgsqlDbType = NpgsqlDbType.Bigint });
             insertCommand.Parameters.Add(new NpgsqlParameter() { Value = info.Tags, NpgsqlDbType = NpgsqlDbType.Text | NpgsqlDbType.Array });
+            insertCommand.Parameters.Add(new NpgsqlParameter() { Value = Path.GetExtension(content.Name), NpgsqlDbType = NpgsqlDbType.Text});
+            insertCommand.Parameters.Add(new NpgsqlParameter() { Value = (object?)info.LinkedExternalId ?? DBNull.Value, NpgsqlDbType = NpgsqlDbType.Bigint});
 
             await insertCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -91,8 +103,9 @@ public class PgStorage : IReceiptStorage
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         var command = new NpgsqlCommand("""
-                                        select file, type, title, logtimestamp from logs
+                                        select file, type, title, logtimestamp, file_extension from logs
                                         where externalid = $1
+                                        order by logtimestamp desc
                                         """,
             connection,
             transaction);
@@ -102,6 +115,7 @@ public class PgStorage : IReceiptStorage
         uint? file = null;
         string? type = null;
         string? title = null;
+        string? extension = null;
         DateTime? logtimestamp = null;
 
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -112,6 +126,7 @@ public class PgStorage : IReceiptStorage
                 type = reader.GetString(1);
                 title = reader.GetString(2);
                 logtimestamp = reader.GetDateTime(3);
+                extension = reader.GetString(4);
             }
 
         }
@@ -131,10 +146,89 @@ public class PgStorage : IReceiptStorage
         await npgSqlStream.CopyToAsync(memoryStream, cancellationToken);
         memoryStream.Position = 0;
 
-        var content = new Content($"{title} {logtimestamp.Value:yyyy-MM-dd}", memoryStream);
+        var content = new Content($"{title} {logtimestamp.Value:yyyy-MM-dd}{extension}", memoryStream);
 
         return content;
 
+    }
+
+    public async Task<ReceiptDetails?> TryGetLinkedDetails(ReceiptDetails info, CancellationToken cancellationToken)
+    {
+        var properties = info
+            .IterateProperties()
+            .DistinctBy(p => p.key)
+            .ToDictionary(_ => _.key, _ => _.value);
+
+        var options = _linkOptions.CurrentValue;
+        if (options == null) return null;
+
+        var connection = await OpenConnectionAsync(cancellationToken);
+
+        var subBuilder = new StringBuilder();
+
+        var paramters = new List<NpgsqlParameter>();
+        var iterator = 1;
+
+        var conditions = new List<(string, string)[]>();
+
+
+        foreach (var (_, rule) in options.Rules)
+        {
+            var currentRulesConditions = new List<(string, string)>();
+
+            foreach (var (sourceName, targetName) in rule)
+            {
+                if (!properties.TryGetValue(targetName, out var targetValue))
+                {
+                    currentRulesConditions.Clear();
+                    break;
+                }
+
+                currentRulesConditions.Add((targetName, targetValue));
+            }
+
+            if (currentRulesConditions.Any())
+            {
+                conditions.Add(currentRulesConditions.ToArray());
+            }
+        }
+
+        if (!conditions.Any())
+        {
+            return null;
+        }
+
+        for (int index = 0; index < conditions.Count; index++)
+        {
+            if (index > 0)
+            {
+                subBuilder.Append(" or ");
+            }
+
+            subBuilder.Append($"( details @> ${iterator++} )");
+            paramters.Add(new NpgsqlParameter() {Value = conditions[index], DataTypeName = "log_properties[]"});
+        }
+
+        var textBuilder = new StringBuilder($"""
+                                             select *
+                                             from logs
+                                             where {subBuilder}
+                                             """);
+
+        
+
+        var command = new NpgsqlCommand(textBuilder.ToString(), connection);
+        command.Parameters.AddRange(paramters.ToArray());
+
+
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            return FromReader(reader);
+        }
+
+        return null;
     }
 
     private async ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken)
@@ -170,6 +264,9 @@ public class PgStorage : IReceiptStorage
                                            ALTER TABLE logs
                                                 add column if not exists externalId bigint not null,
                                                 add column if not exists tags text[];
+                                           ALTER TABLE logs
+                                                add column if not exists file_extension text,
+                                                add column if not exists linked_externalid bigint;
                                            """,
             checkConnection);
 
@@ -177,6 +274,38 @@ public class PgStorage : IReceiptStorage
 
 
         return await dataSourceBuilder.Build().OpenConnectionAsync(cancellationToken);
+    }
+
+    private static ReceiptDetails FromReader(NpgsqlDataReader reader)
+    {
+        return new ReceiptDetails
+        {
+            Title = Get<string>("title"),
+            Timestamp = Get<DateTime>("logtimestamp"),
+            Type =  Get<string>("type"),
+            Amount =  Get<double>("amount"),
+            Currency = Get<string>("currency"),
+            Details =  Get<(string, string)[]>("details"),
+            ExternalId =  Get<long>("externalId"),
+            LinkedExternalId =  GetOrDefault<long>("linked_externalId"),
+            Tags =  Get<string[]>("tags")
+        };
+
+        T Get<T>(string name) where T : notnull
+        {
+            var position = reader.GetOrdinal(name);
+            if (reader.IsDBNull(position)) throw new InvalidOperationException();
+
+            return reader.GetFieldValue<T>(position);
+        }
+
+        T? GetOrDefault<T>(string name)
+        {
+            var position = reader.GetOrdinal(name);
+            if (reader.IsDBNull(position)) return default;
+
+            return reader.GetFieldValue<T>(position);
+        }
     }
 }
 

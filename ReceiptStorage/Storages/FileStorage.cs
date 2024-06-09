@@ -37,6 +37,11 @@ public class FileStorage : IReceiptStorage
         return Task.FromResult<Content?>(null);
     }
 
+    public Task<ReceiptDetails?> TryGetLinkedDetails(ReceiptDetails info, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<ReceiptDetails?>(null);
+    }
+
     async Task TryCreateFolder(string name)
     {
         if (!Directory.Exists(name))

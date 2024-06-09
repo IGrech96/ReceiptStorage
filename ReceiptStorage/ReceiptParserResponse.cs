@@ -70,4 +70,15 @@ public record struct ReceiptDetails
     public string[] Tags { get; set; } = [];
 
     public long ExternalId { get; set; }
+    public long? LinkedExternalId { get; set; }
+
+    public IEnumerable<(string key, string value)> IterateProperties()
+    {
+        yield return (nameof(ReceiptDetails.Title), Title);
+        yield return (nameof(ReceiptDetails.Type), Type);
+        foreach (var data in Details)
+        {
+            yield return data;
+        }
+    }
 }

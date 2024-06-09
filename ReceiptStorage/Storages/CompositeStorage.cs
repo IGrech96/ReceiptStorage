@@ -25,4 +25,9 @@ public class CompositeStorage : IReceiptStorage
     {
         return await _dbStorage.TryGetContentByExternalIdAsync(messageId, cancellationToken);
     }
+
+    public async Task<ReceiptDetails?> TryGetLinkedDetails(ReceiptDetails info, CancellationToken cancellationToken)
+    {
+        return await _dbStorage.TryGetLinkedDetails(info, cancellationToken);
+    }
 }

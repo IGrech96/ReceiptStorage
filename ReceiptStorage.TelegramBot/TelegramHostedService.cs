@@ -254,21 +254,26 @@ public class TelegramHostedService : IHostedService
         if (info.Success)
         {
             var responceBuilder = InfoToText(info);
+            var details = info.Details.Value;
 
             var finalText = responceBuilder.ToString();
 
             responceBuilder.AppendLine("_Processing_");
+
+            var linkedMessage = await _storage.TryGetLinkedDetails(details, cancellationToken);
 
             var sentMessage = await botClient.SendTextMessageAsync(
                 chatId: message.Chat.Id,
                 responceBuilder.ToString(),
                 parseMode:ParseMode.MarkdownV2,
                 replyMarkup: onSuccessKeyboard,
+                replyToMessageId: (int?)linkedMessage?.ExternalId,
                 cancellationToken: cancellationToken
             );
 
-            var details = info.Details.Value;
+            
             details.ExternalId = sentMessage.MessageId;
+            details.LinkedExternalId = linkedMessage?.ExternalId;
 
             await _storage.SaveAsync(content, details, new TelegramUser(from), cancellationToken);
 

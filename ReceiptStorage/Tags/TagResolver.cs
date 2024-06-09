@@ -32,7 +32,7 @@ public class TagResolver : ITagResolver
 
     private bool TryMatch(ReceiptDetails details, TagResolverRule rule, [NotNullWhen(true)] out string[]? tags)
     {
-        var properties = IterateProperties()
+        var properties = details.IterateProperties()
             .Where(p => IsMatch(p.key, rule.PropertyName) &&
                         IsMatch(p.value, rule.PropertyValue))
             .ToArray();
@@ -96,17 +96,6 @@ public class TagResolver : ITagResolver
             }
 
             return true;
-        }
-
-
-        IEnumerable<(string key, string value)> IterateProperties()
-        {
-            yield return (nameof(ReceiptDetails.Title), details.Title);
-            yield return (nameof(ReceiptDetails.Type), details.Type);
-            foreach (var data in details.Details)
-            {
-                yield return data;
-            }
         }
     }
 }

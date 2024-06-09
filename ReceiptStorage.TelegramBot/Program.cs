@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using ReceiptStorage;
 using ReceiptStorage.Extensions;
+using ReceiptStorage.Links;
 using ReceiptStorage.Storages;
 using ReceiptStorage.Tags;
 using ReceiptStorage.TelegramBot;
@@ -13,6 +14,7 @@ host.Services.Configure<BotSettings>(host.Configuration.GetSection(nameof(BotSet
 host.Services.Configure<PgStorageSettings>(host.Configuration.GetSection(nameof(PgStorageSettings)));
 host.Services.Configure<FileStorageSettings>(host.Configuration.GetSection(nameof(FileStorageSettings)));
 host.Services.Configure<TagResolverSettings>(host.Configuration.GetSection(nameof(TagResolverSettings)));
+host.Services.Configure<LinkSettings>(host.Configuration.GetSection(nameof(LinkSettings)));
 host.Services.AddSingleton<IReceiptParser, ReceiptStorage.ReceiptParser>();
 host.Services.AddDefaultTemplates();
 host.Services.AddDefaultStorages();
