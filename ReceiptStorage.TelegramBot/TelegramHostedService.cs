@@ -321,6 +321,7 @@ public class TelegramHostedService : IHostedService
     private static string Escape(string value) =>
         value
             .Replace(".", "\\.")
+            .Replace("!", "\\!")
             .Replace("_", "\\_")
             .Replace("-", "\\-")
             .Replace("(", "\\(")
